@@ -2,7 +2,6 @@ package memberlist
 
 import (
 	"io"
-	"log"
 	"os"
 	"time"
 )
@@ -152,7 +151,7 @@ type Config struct {
 	// this for the internal logger. If Logger is not set, it will fall back to the
 	// behavior for using LogOutput. You cannot specify both LogOutput and Logger
 	// at the same time.
-	Logger *log.Logger
+	Logger Logger
 }
 
 // DefaultLANConfig returns a sane set of configurations for Memberlist.

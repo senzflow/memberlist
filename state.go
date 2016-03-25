@@ -228,7 +228,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	deadline := time.Now().Add(m.config.ProbeInterval)
 	destAddr := &net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
 	if err := m.encodeAndSendMsg(destAddr, pingMsg, &ping); err != nil {
-		m.logger.Printf("[ERR] memberlist: Failed to send ping: %s", err)
+		m.logger.Errorf("memberlist: Failed to send ping: %s", err)
 		return
 	}
 
@@ -254,7 +254,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 			ackCh <- v
 		}
 	case <-time.After(m.config.ProbeTimeout):
-		m.logger.Printf("[DEBUG] memberlist: Failed UDP ping: %v (timeout reached)", node.Name)
+		m.logger.Debugf("memberlist: Failed UDP ping: %v (timeout reached)", node.Name)
 	}
 
 	// Get some random live nodes.
@@ -268,7 +268,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	for _, peer := range kNodes {
 		destAddr := &net.UDPAddr{IP: peer.Addr, Port: int(peer.Port)}
 		if err := m.encodeAndSendMsg(destAddr, indirectPingMsg, &ind); err != nil {
-			m.logger.Printf("[ERR] memberlist: Failed to send indirect ping: %s", err)
+			m.logger.Errorf("memberlist: Failed to send indirect ping: %s", err)
 		}
 	}
 
@@ -289,7 +289,7 @@ func (m *Memberlist) probeNode(node *nodeState) {
 			defer close(fallbackCh)
 			didContact, err := m.sendPingAndWaitForAck(destAddr, ping, deadline)
 			if err != nil {
-				m.logger.Printf("[ERR] memberlist: Failed TCP fallback ping: %s", err)
+				m.logger.Errorf("memberlist: Failed TCP fallback ping: %s", err)
 			} else {
 				fallbackCh <- didContact
 			}
@@ -314,13 +314,13 @@ func (m *Memberlist) probeNode(node *nodeState) {
 	// any additional time here.
 	for didContact := range fallbackCh {
 		if didContact {
-			m.logger.Printf("[WARN] memberlist: Was able to reach %s via TCP but not UDP, network may be misconfigured and not allowing bidirectional UDP", node.Name)
+			m.logger.Warnf("memberlist: Was able to reach %s via TCP but not UDP, network may be misconfigured and not allowing bidirectional UDP", node.Name)
 			return
 		}
 	}
 
 	// No acks received from target, suspect
-	m.logger.Printf("[INFO] memberlist: Suspect %s has failed, no acks received", node.Name)
+	m.logger.Infof("memberlist: Suspect %s has failed, no acks received", node.Name)
 	s := suspect{Incarnation: node.Incarnation, Node: node.Name, From: m.config.Name}
 	m.suspectNode(&s)
 }
@@ -352,7 +352,7 @@ func (m *Memberlist) Ping(node string, addr net.Addr) (time.Duration, error) {
 		// Timeout, return an error below.
 	}
 
-	m.logger.Printf("[DEBUG] memberlist: Failed UDP ping: %v (timeout reached)", node)
+	m.logger.Debugf("memberlist: Failed UDP ping: %v (timeout reached)", node)
 	return 0, NoPingResponseError{ping.Node}
 }
 
@@ -411,7 +411,7 @@ func (m *Memberlist) gossip() {
 		// Send the compound message
 		destAddr := &net.UDPAddr{IP: node.Addr, Port: int(node.Port)}
 		if err := m.rawSendMsgUDP(destAddr, compound.Bytes()); err != nil {
-			m.logger.Printf("[ERR] memberlist: Failed to send gossip to %s: %s", destAddr, err)
+			m.logger.Errorf("memberlist: Failed to send gossip to %s: %s", destAddr, err)
 		}
 	}
 }
@@ -435,7 +435,7 @@ func (m *Memberlist) pushPull() {
 
 	// Attempt a push pull
 	if err := m.pushPullNode(node.Addr, node.Port, false); err != nil {
-		m.logger.Printf("[ERR] memberlist: Push/Pull with %s failed: %s", node.Name, err)
+		m.logger.Errorf("memberlist: Push/Pull with %s failed: %s", node.Name, err)
 	}
 }
 
@@ -688,7 +688,7 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 			DCur: a.Vsn[5],
 		}
 		if err := m.config.Alive.NotifyAlive(node); err != nil {
-			m.logger.Printf("[WARN] memberlist: ignoring alive message for '%s': %s",
+			m.logger.Warnf("memberlist: ignoring alive message for '%s': %s",
 				a.Node, err)
 			return
 		}
@@ -727,7 +727,7 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 
 	// Check if this address is different than the existing node
 	if !bytes.Equal([]byte(state.Addr), a.Addr) || state.Port != a.Port {
-		m.logger.Printf("[ERR] memberlist: Conflicting address for %s. Mine: %v:%d Theirs: %v:%d",
+		m.logger.Errorf("memberlist: Conflicting address for %s. Mine: %v:%d Theirs: %v:%d",
 			state.Name, state.Addr, state.Port, net.IP(a.Addr), a.Port)
 
 		// Inform the conflict delegate if provided
@@ -798,7 +798,7 @@ func (m *Memberlist) aliveNode(a *alive, notify chan struct{}, bootstrap bool) {
 			Vsn:         versions,
 		}
 		m.encodeBroadcastNotify(a.Node, aliveMsg, a, notify)
-		m.logger.Printf("[WARN] memberlist: Refuting an alive message")
+		m.logger.Warnf("memberlist: Refuting an alive message")
 	} else {
 		m.encodeBroadcastNotify(a.Node, aliveMsg, a, notify)
 
@@ -879,7 +879,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 			},
 		}
 		m.encodeAndBroadcast(s.Node, aliveMsg, a)
-		m.logger.Printf("[WARN] memberlist: Refuting a suspect message (from: %s)", s.From)
+		m.logger.Warnf("memberlist: Refuting a suspect message (from: %s)", s.From)
 		return // Do not mark ourself suspect
 	} else {
 		m.encodeAndBroadcast(s.Node, suspectMsg, s)
@@ -911,7 +911,7 @@ func (m *Memberlist) suspectNode(s *suspect) {
 // suspectTimeout is invoked when a suspect timeout has occurred
 func (m *Memberlist) suspectTimeout(n *nodeState) {
 	// Construct a dead message
-	m.logger.Printf("[INFO] memberlist: Marking %s as failed, suspect timeout reached", n.Name)
+	m.logger.Infof("memberlist: Marking %s as failed, suspect timeout reached", n.Name)
 	d := dead{Incarnation: n.Incarnation, Node: n.Name, From: m.config.Name}
 	m.deadNode(&d)
 }
@@ -960,7 +960,7 @@ func (m *Memberlist) deadNode(d *dead) {
 				},
 			}
 			m.encodeAndBroadcast(d.Node, aliveMsg, a)
-			m.logger.Printf("[WARN] memberlist: Refuting a dead message (from: %s)", d.From)
+			m.logger.Warnf("memberlist: Refuting a dead message (from: %s)", d.From)
 			return // Do not mark ourself dead
 		}
 

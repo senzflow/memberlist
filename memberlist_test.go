@@ -234,7 +234,6 @@ func TestCreate_keyringAndSecretKey(t *testing.T) {
 
 func TestCreate_invalidLoggerSettings(t *testing.T) {
 	c := DefaultLANConfig()
-	c.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
 	c.LogOutput = ioutil.Discard
 
 	_, err := Create(c)

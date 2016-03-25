@@ -16,7 +16,6 @@ package memberlist
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strconv"
@@ -55,7 +54,7 @@ type Memberlist struct {
 
 	broadcasts *TransmitLimitedQueue
 
-	logger *log.Logger
+	logger Logger
 }
 
 // newMemberlist creates the network listeners.
@@ -116,7 +115,7 @@ func newMemberlist(conf *Config) (*Memberlist, error) {
 
 	logger := conf.Logger
 	if logger == nil {
-		logger = log.New(logDest, "", log.LstdFlags)
+		logger = defaultLogger()
 	}
 
 	m := &Memberlist{
@@ -176,7 +175,7 @@ func (m *Memberlist) Join(existing []string) (int, error) {
 		if err != nil {
 			err = fmt.Errorf("Failed to resolve %s: %v", exist, err)
 			errs = multierror.Append(errs, err)
-			m.logger.Printf("[WARN] memberlist: %v", err)
+			m.logger.Warnf("memberlist: %v", err)
 			continue
 		}
 
@@ -184,7 +183,7 @@ func (m *Memberlist) Join(existing []string) (int, error) {
 			if err := m.pushPullNode(addr, port, true); err != nil {
 				err = fmt.Errorf("Failed to join %s: %v", net.IP(addr), err)
 				errs = multierror.Append(errs, err)
-				m.logger.Printf("[DEBUG] memberlist: %v", err)
+				m.logger.Debugf("memberlist: %v", err)
 				continue
 			}
 			numSuccess++
@@ -309,7 +308,7 @@ func (m *Memberlist) setAlive() error {
 	// Check if this is a public address without encryption
 	addrStr := net.IP(advertiseAddr).String()
 	if !IsPrivateIP(addrStr) && !isLoopbackIP(addrStr) && !m.config.EncryptionEnabled() {
-		m.logger.Printf("[WARN] memberlist: Binding to public address without encryption!")
+		m.logger.Warnf("memberlist: Binding to public address without encryption!")
 	}
 
 	// Get the node meta data
@@ -503,7 +502,7 @@ func (m *Memberlist) Leave(timeout time.Duration) error {
 		state, ok := m.nodeMap[m.config.Name]
 		m.nodeLock.Unlock()
 		if !ok {
-			m.logger.Printf("[WARN] memberlist: Leave but we're not in the node map.")
+			m.logger.Warnf("memberlist: Leave but we're not in the node map.")
 			return nil
 		}
 
